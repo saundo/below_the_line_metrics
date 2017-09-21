@@ -30,9 +30,9 @@ def thread_module(*args, *kwargs):
 ######### Keen API calls ###################################################
 ### Grabbing cookies ###
 
-def ad_interaction(start, end, *kwargs):
+def ad_interaction(start, end, **kwargs):
     """Keen ad_interaction event collection
-    *kwargs
+    **kwargs
     + filter properities on campaign
     + fitler on interaction type (most likely click), or return all interactions
     returns:
@@ -40,7 +40,67 @@ def ad_interaction(start, end, *kwargs):
     + keen timestamp
     +
     """
-    pass
+    if 'Interaction' in kwargs:
+        interaction = kwargs['Interaction']
+        op2 = 'contains'
+    else:
+        op2 = 'exists'
+        interaction = True
+    
+    if 'Client' in kwargs:
+        client = str.lower(kwargs['Client'])
+        op3 = 'contains'
+    else:
+        op3 = 'exists'
+        client = True
+    
+    if 'Campaign' in kwargs:
+        campaign = str.lower(kwargs['Campaign'])
+        op4 = 'contains'
+    else:
+        op4 = 'exists'
+        campaign = True
+    
+    
+    event = 'ad_interaction'
+    
+    timeframe = {'start':start, 'end':end}
+    interval = None
+    timezone = None
+
+    group_by = ('ad_meta.unit.id') # could potentially use 'article.permalink' instead of id
+    
+    property_name1 = 'ad_meta.unit.type'
+    operator1 = 'eq'
+    property_value1 = 'display'
+    
+    property_name2 = 'interaction.name'
+    operator2 = op2
+    property_value2 = interaction
+    
+    property_name3 = 'ad_meta.client.name'
+    operator3 = op3
+    property_value3 = client
+    
+    property_name4 = 'ad_meta.campaign.name'
+    operator4 = op4
+    property_value4 = campaign
+    
+    
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
+              {"property_name":property_name2, "operator":operator2, "property_value":property_value2},
+              {"property_name":property_name3, "operator":operator3, "property_value":property_value3},
+              {"property_name":property_name4, "operator":operator4, "property_value":property_value4}]    
+
+    data = keen.count(event, 
+                    timeframe=timeframe,
+                    interval=interval,
+                    timezone=timezone,
+                    group_by=group_by,
+                    filters=filters)
+    
+    return data
+    
 
 def ad_video_progress(start, end, *kwargs):
     """Keen ad_video_progress event collection
