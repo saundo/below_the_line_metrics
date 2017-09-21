@@ -109,17 +109,80 @@ def ad_interaction(start, end, **kwargs):
     return data
     
 
-def ad_video_progress(start, end, *kwargs):
+def ad_video_progress(start, end, **kwargs):
     """Keen ad_video_progress event collection
-    *kwargs
-    + filter properities on campaign
-    + fitler on interaction type (most likely click)
+    **kwargs
+        Client: filter on client.name
+            ex. Client='amex'
+        Campaign: filter on campaign.name
+            ex. Campaign='platinum'
+        Video_Progress: filter on specific point watched in video
+            ex. Video_Progress=5 or Video_Progress=[5,25,50,75,100]
     returns:
     + permanent cookies
     + keen timestamp
     + progress type
     """
-    pass
+    if 'Video_Progress' in kwargs:
+        video_mark = kwargs['Video_Progress']
+        op2 = 'in'
+    else:
+        op2 = 'exists'
+        video_mark = True
+    
+    if 'Client' in kwargs:
+        client = str.lower(kwargs['Client'])
+        op3 = 'contains'
+    else:
+        op3 = 'exists'
+        client = True
+    
+    if 'Campaign' in kwargs:
+        campaign = str.lower(kwargs['Campaign'])
+        op4 = 'contains'
+    else:
+        op4 = 'exists'
+        campaign = True
+    
+    
+    event = 'ad_video_progress'
+    
+    timeframe = {'start':start, 'end':end}
+    interval = None
+    timezone = None
+
+    group_by = ('user.cookie.permanent.id','keen.timestamp', 'video.progress.percent_viewed')
+    
+    property_name1 = 'ad_meta.unit.type'
+    operator1 = 'eq'
+    property_value1 = 'display'
+    
+    property_name2 = 'video.progress.percent_viewed'
+    operator2 = op2
+    property_value2 = video_mark
+    
+    property_name3 = 'ad_meta.client.name'
+    operator3 = op3
+    property_value3 = client
+    
+    property_name4 = 'ad_meta.campaign.name'
+    operator4 = op4
+    property_value4 = campaign
+    
+    
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
+              {"property_name":property_name2, "operator":operator2, "property_value":property_value2},
+              {"property_name":property_name3, "operator":operator3, "property_value":property_value3},
+              {"property_name":property_name4, "operator":operator4, "property_value":property_value4}]    
+
+    data = keen.count(event, 
+                    timeframe=timeframe,
+                    interval=interval,
+                    timezone=timezone,
+                    group_by=group_by,
+                    filters=filters)
+    
+    return data
 
 def ad_time_spent(start, end, *kwargs):
     """Keen ad_time_spent event collection
