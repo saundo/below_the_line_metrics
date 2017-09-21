@@ -33,8 +33,15 @@ def thread_module(*args, *kwargs):
 def ad_interaction(start, end, **kwargs):
     """Keen ad_interaction event collection
     **kwargs
-    + filter properities on campaign
-    + fitler on interaction type (most likely click), or return all interactions
+        Client: filter on client.name
+            ex. Client='amex'
+        Campaign: filter on campaign.name
+            ex. Campaign='platinum'
+        Interaction: filter on interaction name
+            ex. Interaction='clicked'
+    + filter properties on client
+    + filter properties on campaign
+    + filter on interaction name (most likely click), or return all interactions by excluding
     returns:
     + permanent cookies
     + keen timestamp
@@ -68,7 +75,7 @@ def ad_interaction(start, end, **kwargs):
     interval = None
     timezone = None
 
-    group_by = ('ad_meta.unit.id') # could potentially use 'article.permalink' instead of id
+    group_by = ('user.cookie.permanent.id','keen.timestamp')
     
     property_name1 = 'ad_meta.unit.type'
     operator1 = 'eq'
