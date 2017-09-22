@@ -219,9 +219,14 @@ def ad_interaction(start, end, *kwargs):
     """
     pass
 
-def read_article_metrics(start, end, *kwargs):
+def read_article_metrics(start, end, **kwargs):
     """Keen read_article event collection: for metrics
-    *kwargs
+    **kwargs
+        Cookie_list: filters on list of permanent cookie ids
+            ex. Cookie_list= ['87fd7118a0b192b73ef85aa1bbe67605',
+                            'fd3497098005826b45837f2ba4fe3900',
+                            '909463db46b2900eb1c8d9c9b95b51d6',
+                            '001422e90a7dd8e1f834214ae74303aa']
     + filter on COOOKIES
     returns:
     + obsessions
@@ -230,9 +235,48 @@ def read_article_metrics(start, end, *kwargs):
     + device
     + geography
     + keen timestamp
-    + TK
+    + Cookie.ids
     """
-    pass
+    if 'Cookie_list' in kwargs:
+        cookie_list = kwargs['Cookie_list']
+        op2 = 'in'
+    else:
+        op2 = 'exists'
+        interaction = True
+    
+    event = 'read_article'
+    
+    timeframe = {'start':start, 'end':end}
+    interval = None
+    timezone = None
+
+    group_by = ('article.obsessions',
+                'article.topic',
+                'glass.device',
+                'user.geolocation.country',
+                'keen.timestamp',
+                'article.id',
+                'user.cookie.permanent.id')
+    
+    property_name1 = 'read.type'
+    operator1 = 'eq'
+    property_value1 = 'start'
+    
+    property_name2 = 'user.cookie.permanent.id'
+    operator2 = op2
+    property_value2 = cookie_list
+    
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
+              {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]   
+
+    data = keen.count(event, 
+                    timeframe=timeframe,
+                    interval=interval,
+                    timezone=timezone,
+                    group_by=group_by,
+                    filters=filters)
+    
+    return data
 
 ######### Classes ###################################################
 
