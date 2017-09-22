@@ -254,7 +254,7 @@ def read_article_metrics(start, end, **kwargs):
                 'article.topic',
                 'glass.device',
                 'user.geolocation.country',
-                'keen.timestamp',
+                'keen.created_at',
                 'article.id',
                 'user.cookie.permanent.id')
     
