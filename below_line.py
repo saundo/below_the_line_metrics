@@ -104,6 +104,99 @@ def ad_interaction(start, end, **kwargs):
 
     return data
 
+def ad_impression(start, end, **kwargs):
+    """Keen ad_impression event collection
+    **kwargs
+        Client: filter on client.name
+            ex. Client='gates-foundation'
+        Campaign: filter on campaign.name
+            ex. Campaign='gates-foundation_q3_2017'
+        Creative: filter on creative.name
+            ex. Video='incredible-progress'
+        Version: filter on campaign.version.name
+            ex. Version='N/A'
+    returns:
+    + filter properties on client
+    + filter properties on campaign
+    + filter properties on creative
+    + filter properties on version
+    + permanent cookies
+    + keen timestamp
+    +
+    """
+    
+    if 'Client' in kwargs:
+        client = str.lower(kwargs['Client'])
+        op2 = 'contains'
+    else:
+        op2 = 'exists'
+        client = True
+    
+    if 'Campaign' in kwargs:
+        campaign = str.lower(kwargs['Campaign'])
+        op3 = 'contains'
+    else:
+        op3 = 'exists'
+        campaign = True
+        
+    if 'Creative' in kwargs:
+        creative = str.lower(kwargs['Creative'])
+        op4 = 'contains'
+    else:
+        op4 = 'exists'
+        creative = True
+        
+    if 'Version' in kwargs:
+        version = str.lower(kwargs['Version'])
+        op5 = 'contains'
+    else:
+        op5 = 'exists'
+        version = True    
+    
+    
+    event = 'ad_impression'
+    
+    timeframe = {'start':start, 'end':end}
+    interval = None
+    timezone = None
+
+    group_by = ('user.cookie.permanent.id','keen.timestamp')
+    
+    property_name1 = 'ad_meta.unit.type'
+    operator1 = 'eq'
+    property_value1 = 'display'
+    
+    property_name2 = 'ad_meta.client.name'
+    operator2 = op2
+    property_value2 = client
+    
+    property_name3 = 'ad_meta.campaign.name'
+    operator3 = op3
+    property_value3 = campaign
+    
+    property_name4 = 'ad_meta.creative.name'
+    operator4 = op4
+    property_value4 = creative
+    
+    property_name5 = 'ad_meta.campaign.version.name'
+    operator5 = op5
+    property_value5 = version
+    
+    
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
+               {"property_name":property_name2, "operator":operator2, "property_value":property_value2},
+               {"property_name":property_name3, "operator":operator3, "property_value":property_value3},
+               {"property_name":property_name4, "operator":operator4, "property_value":property_value4},
+               {"property_name":property_name5, "operator":operator5, "property_value":property_value5}]    
+
+    data = keen.count(event, 
+                    timeframe=timeframe,
+                    interval=interval,
+                    timezone=timezone,
+                    group_by=group_by,
+                    filters=filters)
+    
+    return data
 
 def ad_video_progress(start, end, **kwargs):
     """Keen ad_video_progress event collection
