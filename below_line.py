@@ -39,13 +39,9 @@ def ad_interaction(start, end, **kwargs):
             ex. Campaign='platinum'
         Interaction: filter on interaction name
             ex. Interaction='clicked'
-    + filter properties on client
-    + filter properties on campaign
-    + filter on interaction name (most likely click), or return all interactions by excluding
     returns:
     + permanent cookies
-    + keen timestamp
-    +
+    + keen.created_at
     """
     if 'Interaction' in kwargs:
         interaction = kwargs['Interaction']
@@ -53,61 +49,61 @@ def ad_interaction(start, end, **kwargs):
     else:
         op2 = 'exists'
         interaction = True
-    
+
     if 'Client' in kwargs:
         client = str.lower(kwargs['Client'])
         op3 = 'contains'
     else:
         op3 = 'exists'
         client = True
-    
+
     if 'Campaign' in kwargs:
         campaign = str.lower(kwargs['Campaign'])
         op4 = 'contains'
     else:
         op4 = 'exists'
         campaign = True
-    
-    
+
+
     event = 'ad_interaction'
-    
+
     timeframe = {'start':start, 'end':end}
     interval = None
     timezone = None
 
-    group_by = ('user.cookie.permanent.id','keen.timestamp')
-    
+    group_by = ('user.cookie.permanent.id','keen.created_at')
+
     property_name1 = 'ad_meta.unit.type'
     operator1 = 'eq'
     property_value1 = 'display'
-    
+
     property_name2 = 'interaction.name'
     operator2 = op2
     property_value2 = interaction
-    
+
     property_name3 = 'ad_meta.client.name'
     operator3 = op3
     property_value3 = client
-    
+
     property_name4 = 'ad_meta.campaign.name'
     operator4 = op4
     property_value4 = campaign
-    
-    
+
+
     filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
               {"property_name":property_name2, "operator":operator2, "property_value":property_value2},
               {"property_name":property_name3, "operator":operator3, "property_value":property_value3},
-              {"property_name":property_name4, "operator":operator4, "property_value":property_value4}]    
+              {"property_name":property_name4, "operator":operator4, "property_value":property_value4}]
 
-    data = keen.count(event, 
+    data = keen.count(event,
                     timeframe=timeframe,
                     interval=interval,
                     timezone=timezone,
                     group_by=group_by,
                     filters=filters)
-    
+
     return data
-    
+
 
 def ad_video_progress(start, end, **kwargs):
     """Keen ad_video_progress event collection
@@ -120,7 +116,7 @@ def ad_video_progress(start, end, **kwargs):
             ex. Video_Progress=5 or Video_Progress=[5,25,50,75,100]
     returns:
     + permanent cookies
-    + keen timestamp
+    + keen.created_at
     + progress type
     """
     if 'Video_Progress' in kwargs:
@@ -129,59 +125,59 @@ def ad_video_progress(start, end, **kwargs):
     else:
         op2 = 'exists'
         video_mark = True
-    
+
     if 'Client' in kwargs:
         client = str.lower(kwargs['Client'])
         op3 = 'contains'
     else:
         op3 = 'exists'
         client = True
-    
+
     if 'Campaign' in kwargs:
         campaign = str.lower(kwargs['Campaign'])
         op4 = 'contains'
     else:
         op4 = 'exists'
         campaign = True
-    
-    
+
+
     event = 'ad_video_progress'
-    
+
     timeframe = {'start':start, 'end':end}
     interval = None
     timezone = None
 
-    group_by = ('user.cookie.permanent.id','keen.timestamp', 'video.progress.percent_viewed')
-    
+    group_by = ('user.cookie.permanent.id','keen.created_at', 'video.progress.percent_viewed')
+
     property_name1 = 'ad_meta.unit.type'
     operator1 = 'eq'
     property_value1 = 'display'
-    
+
     property_name2 = 'video.progress.percent_viewed'
     operator2 = op2
     property_value2 = video_mark
-    
+
     property_name3 = 'ad_meta.client.name'
     operator3 = op3
     property_value3 = client
-    
+
     property_name4 = 'ad_meta.campaign.name'
     operator4 = op4
     property_value4 = campaign
-    
-    
+
+
     filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
               {"property_name":property_name2, "operator":operator2, "property_value":property_value2},
               {"property_name":property_name3, "operator":operator3, "property_value":property_value3},
-              {"property_name":property_name4, "operator":operator4, "property_value":property_value4}]    
+              {"property_name":property_name4, "operator":operator4, "property_value":property_value4}]
 
-    data = keen.count(event, 
+    data = keen.count(event,
                     timeframe=timeframe,
                     interval=interval,
                     timezone=timezone,
                     group_by=group_by,
                     filters=filters)
-    
+
     return data
 
 def ad_time_spent(start, end, *kwargs):
@@ -191,7 +187,7 @@ def ad_time_spent(start, end, *kwargs):
     + fitler on interaction type (most likely click)
     returns:
     + permanent cookies
-    + keen timestamp
+    + keen.created_at
     + time spent
     """
     pass
@@ -227,14 +223,13 @@ def read_article_metrics(start, end, **kwargs):
                             'fd3497098005826b45837f2ba4fe3900',
                             '909463db46b2900eb1c8d9c9b95b51d6',
                             '001422e90a7dd8e1f834214ae74303aa']
-    + filter on COOOKIES
     returns:
     + obsessions
     + topics
     + article.id
     + device
     + geography
-    + keen timestamp
+    + keen.created_at
     + Cookie.ids
     """
     if 'Cookie_list' in kwargs:
@@ -243,9 +238,9 @@ def read_article_metrics(start, end, **kwargs):
     else:
         op2 = 'exists'
         interaction = True
-    
+
     event = 'read_article'
-    
+
     timeframe = {'start':start, 'end':end}
     interval = None
     timezone = None
@@ -257,25 +252,25 @@ def read_article_metrics(start, end, **kwargs):
                 'keen.created_at',
                 'article.id',
                 'user.cookie.permanent.id')
-    
+
     property_name1 = 'read.type'
     operator1 = 'eq'
     property_value1 = 'start'
-    
+
     property_name2 = 'user.cookie.permanent.id'
     operator2 = op2
     property_value2 = cookie_list
-    
-    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
-              {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]   
 
-    data = keen.count(event, 
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
+              {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]
+
+    data = keen.count(event,
                     timeframe=timeframe,
                     interval=interval,
                     timezone=timezone,
                     group_by=group_by,
                     filters=filters)
-    
+
     return data
 
 ######### Classes ###################################################
