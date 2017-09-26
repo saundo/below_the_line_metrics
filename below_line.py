@@ -240,7 +240,7 @@ def ad_video_progress(start, end, **kwargs):
     interval = None
     timezone = None
 
-    group_by = ('user.cookie.permanent.id','keen.created_at', 'video.progress.percent_viewed')
+    group_by = ('user.cookie.permanent.id','keen.created_at','video.title', 'video.progress.percent_viewed')
 
     property_name1 = 'ad_meta.unit.type'
     operator1 = 'eq'
@@ -393,9 +393,36 @@ class metric_generator():
     """class that receives cookie jars, sends them to KEEN, and then recieves
     back data; compiles the multiple data from multiple cookie jars,
     munges data, returns & exports data in a usable format for producers
+    
+    - Receives list of DataFrames
+    - Concatenates into one DataFrame
+    - Methods can organize by different criteria
+    - Export however we want (excel, charts, etc.)
+    
     """
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, dataframes):
+        self.dataframe = pd.concat(dataframes)
+    
+    def obsessions(self):
+        self.obsession = self.dataframe.groupby(['glass.device'])['article.obsessions'].value_counts()
+        self.obsession = self.obsession.unstack("glass.device")
+        self.plot = self.obsession.unstack("glass.device").plot(kind="barh")
+        return(self.obsession)
+    
+    def topics(self):
+        self.topics = self.dataframe.groupby(['glass.device'])['article.topic'].value_counts()
+        self.topics = self.topics.unstack("glass.device")
+        return(self.topics, self.topics.plot(kind="barh"))
+        
+    def countries(self):
+        self.countries = self.dataframe.groupby(['user.geolocation.country'],as_index=False)['result'].sum()
+        self.countries = self.countries.sort_values('result',ascending=False)
+        return(self.countries)
+        
+    def articles(self):
+        self.articles = self.dataframe.groupby(['glass.device'])['article.id'].value_counts()
+        self.articles = self.articles.unstack("glass.device")
+        return(self.articles)
 
 ######### Execute ###################################################
 
