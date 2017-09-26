@@ -160,7 +160,7 @@ def ad_impression(start, end, **kwargs):
     interval = None
     timezone = None
 
-    group_by = ('user.cookie.permanent.id','keen.timestamp')
+    group_by = ('user.cookie.permanent.id','keen.created_at')
     
     property_name1 = 'ad_meta.unit.type'
     operator1 = 'eq'
@@ -394,35 +394,74 @@ class metric_generator():
     back data; compiles the multiple data from multiple cookie jars,
     munges data, returns & exports data in a usable format for producers
     
-    - Receives list of DataFrames
-    - Concatenates into one DataFrame
+    - Receives list of DataFrames as tuples
+        - First df contains list of permanent cookies and time of event action being measured
+        - Second df contains metrics to be analyzed within this class (obsessions/topics/articles read)
+    - Concatenates each into two DataFrames, then combines into one df
+    - Sorts time values by whether the actions occurred within 30 days
+    - Removes actions outside of previous 30 days
     - Methods can organize by different criteria
     - Export however we want (excel, charts, etc.)
     
     """
-    def __init__(self, dataframes):
-        self.dataframe = pd.concat(dataframes)
+    def __init__(self, raw):
+        self.raw = raw
+        self.dataframe = pd.concat([pd.DataFrame(i[1]) for i in raw])
+        self.dataframe = self.dataframe.dropna()
+        self.dataframe['keen.created_at'] = pd.to_datetime(self.dataframe['keen.created_at'])
+        self.cookie_jars = pd.concat([i[0] for i in raw])
+        self.cookie_jars = self.cookie_jars.dropna()
+        storage = {}
+        for cookie in list(set(self.cookie_jars['user.cookie.permanent.id'])):
+            dft = self.cookie_jars[self.cookie_jars['user.cookie.permanent.id']==cookie]
+            try:
+                mins = min(dft['keen.created_at'])
+            except:
+                pass
+            storage.setdefault('user.cookie.permanent.id', []).append(cookie)
+            storage.setdefault('Time_of_action', []).append(mins)
+        df = pd.DataFrame(storage)
+        df['Time_of_action'] = pd.to_datetime(df['Time_of_action'])
+        df['Delta'] = df['Time_of_action'] - timedelta(days=30)
+        self.all = pd.merge(df,self.dataframe,how='right',on='user.cookie.permanent.id')
+        self.all['in30days'] = ((self.all['keen.created_at'] > self.all['Delta'][0])&(self.all['keen.created_at'] < self.all['Time_of_action']))
+        self.false = self.all[self.all['in30days']==False]
     
     def obsessions(self):
-        self.obsession = self.dataframe.groupby(['glass.device'])['article.obsessions'].value_counts()
+        """
+        Function within metrics class. Returns all obsessions read by permanent ids by devices in last 30 days
+        """
+        self.obsession = self.all.groupby(['glass.device'])['article.obsessions'].value_counts()
         self.obsession = self.obsession.unstack("glass.device")
-        self.plot = self.obsession.unstack("glass.device").plot(kind="barh")
+        self.obsession_plot = self.obsession.unstack("glass.device").plot(kind="barh")
         return(self.obsession)
     
     def topics(self):
-        self.topics = self.dataframe.groupby(['glass.device'])['article.topic'].value_counts()
-        self.topics = self.topics.unstack("glass.device")
-        return(self.topics, self.topics.plot(kind="barh"))
+        """
+        Function within metrics class. Returns all topics read by permanent ids by devices in last 30 days
+        """
+        self.topic = self.all.groupby(['glass.device'])['article.topic'].value_counts()
+        self.topic = self.topic.unstack("glass.device")
+        self.topic_plot = self.topic.unstack("glass.device").plot(kind="barh")
+        return(self.topic)
         
     def countries(self):
-        self.countries = self.dataframe.groupby(['user.geolocation.country'],as_index=False)['result'].sum()
-        self.countries = self.countries.sort_values('result',ascending=False)
-        return(self.countries)
+        """
+        Function within metrics class. Returns all countries where permanent ids are located
+        """
+        self.country = self.all.groupby(['glass.device'])['user.geolocation.country'].value_counts()
+        self.country = self.country.unstack("glass.device")
+        self.country_plot = self.country.unstack("glass.device").plot(kind="barh")
+        return(self.country)
         
     def articles(self):
-        self.articles = self.dataframe.groupby(['glass.device'])['article.id'].value_counts()
-        self.articles = self.articles.unstack("glass.device")
-        return(self.articles)
+        """
+        Function within metrics class. Returns all articles read by permanent ids in last 30 days
+        """
+        self.article = self.all.groupby(['glass.device'])['article.id'].value_counts()
+        self.article = self.article.unstack("glass.device")
+        self.article_plot = self.article.unstack("glass.device").plot(kind="bar")
+        return(self.article)
 
 ######### Execute ###################################################
 
