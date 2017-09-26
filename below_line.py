@@ -10,6 +10,7 @@ from keen.client import KeenClient
 from functools import wraps
 from queue import Queue
 from threading import Thread
+from datetime import datetime, timedelta
 
 #load keen credentials and initialize the class
 os.chdir('/users/csaunders/Desktop')
