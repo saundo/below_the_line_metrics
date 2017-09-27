@@ -22,10 +22,39 @@ readKey = Keen_API_credentials[Keen_silo]['readKey']
 keen = KeenClient(project_id=projectID, read_key=readKey)
 
 ######### THREADING MODULE #################################################
-def thread_module(*args, *kwargs):
-    """insert the threading module here
+class DownloadWorker1(Thread):
+    def __init__(self, queue):
+        Thread.__init__(self)
+        self.queue = queue
+
+    def run(self):
+        while True:
+            func, start, end, kwargs = self.queue.get()
+            run_func(func, start, end, kwargs)
+            self.queue.task_done()
+
+def run_func(func, start, end, kwargs):
     """
-    pass
+    """
+    key = func.__name__ + '-' + str(start)
+    thread_storage[key] = func(start, end, **kwargs)
+
+def run_thread(func, timeframe, kwargs):
+    """
+    """
+    global thread_storage
+    thread_storage = {}
+    queue = Queue()
+    for x in range(8):
+        worker = DownloadWorker1(queue)
+        worker.daemon = True
+        worker.start()
+
+    for start,end in timeframe:
+        queue.put((func, start, end, kwargs))
+
+    queue.join()
+    return thread_storage
 
 ######### Keen API calls ###################################################
 ### Grabbing cookies ###
@@ -124,78 +153,78 @@ def ad_impression(start, end, **kwargs):
     + keen timestamp
     +
     """
-    
+
     if 'Client' in kwargs:
         client = str.lower(kwargs['Client'])
         op2 = 'contains'
     else:
         op2 = 'exists'
         client = True
-    
+
     if 'Campaign' in kwargs:
         campaign = str.lower(kwargs['Campaign'])
         op3 = 'contains'
     else:
         op3 = 'exists'
         campaign = True
-        
+
     if 'Creative' in kwargs:
         creative = str.lower(kwargs['Creative'])
         op4 = 'contains'
     else:
         op4 = 'exists'
         creative = True
-        
+
     if 'Version' in kwargs:
         version = str.lower(kwargs['Version'])
         op5 = 'contains'
     else:
         op5 = 'exists'
-        version = True    
-    
-    
+        version = True
+
+
     event = 'ad_impression'
-    
+
     timeframe = {'start':start, 'end':end}
     interval = None
     timezone = None
 
     group_by = ('user.cookie.permanent.id','keen.created_at')
-    
+
     property_name1 = 'ad_meta.unit.type'
     operator1 = 'eq'
     property_value1 = 'display'
-    
+
     property_name2 = 'ad_meta.client.name'
     operator2 = op2
     property_value2 = client
-    
+
     property_name3 = 'ad_meta.campaign.name'
     operator3 = op3
     property_value3 = campaign
-    
+
     property_name4 = 'ad_meta.creative.name'
     operator4 = op4
     property_value4 = creative
-    
+
     property_name5 = 'ad_meta.campaign.version.name'
     operator5 = op5
     property_value5 = version
-    
-    
+
+
     filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
                {"property_name":property_name2, "operator":operator2, "property_value":property_value2},
                {"property_name":property_name3, "operator":operator3, "property_value":property_value3},
                {"property_name":property_name4, "operator":operator4, "property_value":property_value4},
-               {"property_name":property_name5, "operator":operator5, "property_value":property_value5}]    
+               {"property_name":property_name5, "operator":operator5, "property_value":property_value5}]
 
-    data = keen.count(event, 
+    data = keen.count(event,
                     timeframe=timeframe,
                     interval=interval,
                     timezone=timezone,
                     group_by=group_by,
                     filters=filters)
-    
+
     return data
 
 def ad_video_progress(start, end, **kwargs):
@@ -313,7 +342,7 @@ def read_article_metrics(start, end, **kwargs):
     **kwargs
         Cookie_df: filters on list of permanent cookie ids from dataframe
             ex. Cookie_df = dataframe with column 'user.cookie.permanent.id'
-            
+
     + filter on COOOKIES
     returns:
     + obsessions
@@ -330,9 +359,9 @@ def read_article_metrics(start, end, **kwargs):
     else:
         op2 = 'exists'
         interaction = True
-    
+
     event = 'read_article'
-    
+
     timeframe = {'start':start, 'end':end}
     interval = None
     timezone = None
@@ -344,25 +373,25 @@ def read_article_metrics(start, end, **kwargs):
                 'keen.created_at',
                 'article.id',
                 'user.cookie.permanent.id')
-    
+
     property_name1 = 'read.type'
     operator1 = 'eq'
     property_value1 = 'start'
-    
+
     property_name2 = 'user.cookie.permanent.id'
     operator2 = op2
     property_value2 = cookie_list
-    
-    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
-              {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]   
 
-    data = keen.count(event, 
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
+              {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]
+
+    data = keen.count(event,
                     timeframe=timeframe,
                     interval=interval,
                     timezone=timezone,
                     group_by=group_by,
                     filters=filters)
-    
+
     return(kwargs['Cookie_df'],data)
 
 ######### Classes ###################################################
@@ -392,7 +421,7 @@ class metric_generator():
     """class that receives cookie jars, sends them to KEEN, and then recieves
     back data; compiles the multiple data from multiple cookie jars,
     munges data, returns & exports data in a usable format for producers
-    
+
     - Receives list of DataFrames as tuples
         - First df contains list of permanent cookies and time of event action being measured
         - Second df contains metrics to be analyzed within this class (obsessions/topics/articles read)
@@ -401,7 +430,7 @@ class metric_generator():
     - Removes actions outside of previous 30 days
     - Methods can organize by different criteria
     - Export however we want (excel, charts, etc.)
-    
+
     """
     def __init__(self, raw):
         self.raw = raw
@@ -425,7 +454,7 @@ class metric_generator():
         self.all = pd.merge(df,self.dataframe,how='right',on='user.cookie.permanent.id')
         self.all['in30days'] = ((self.all['keen.created_at'] > self.all['Delta'][0])&(self.all['keen.created_at'] < self.all['Time_of_action']))
         self.false = self.all[self.all['in30days']==False]
-    
+
     def obsessions(self):
         """
         Function within metrics class. Returns all obsessions read by permanent ids by devices in last 30 days
@@ -434,7 +463,7 @@ class metric_generator():
         self.obsession = self.obsession.unstack("glass.device")
         self.obsession_plot = self.obsession.unstack("glass.device").plot(kind="barh")
         return(self.obsession)
-    
+
     def topics(self):
         """
         Function within metrics class. Returns all topics read by permanent ids by devices in last 30 days
@@ -443,7 +472,7 @@ class metric_generator():
         self.topic = self.topic.unstack("glass.device")
         self.topic_plot = self.topic.unstack("glass.device").plot(kind="barh")
         return(self.topic)
-        
+
     def countries(self):
         """
         Function within metrics class. Returns all countries where permanent ids are located
@@ -452,7 +481,7 @@ class metric_generator():
         self.country = self.country.unstack("glass.device")
         self.country_plot = self.country.unstack("glass.device").plot(kind="barh")
         return(self.country)
-        
+
     def articles(self):
         """
         Function within metrics class. Returns all articles read by permanent ids in last 30 days
