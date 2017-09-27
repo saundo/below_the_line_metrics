@@ -453,7 +453,7 @@ class metric_generator():
     """class that receives cookie jars, sends them to KEEN, and then recieves
     back data; compiles the multiple data from multiple cookie jars,
     munges data, returns & exports data in a usable format for producers
-
+    
     - Receives list of DataFrames as tuples
         - First df contains list of permanent cookies and time of event action being measured
         - Second df contains metrics to be analyzed within this class (obsessions/topics/articles read)
@@ -462,15 +462,17 @@ class metric_generator():
     - Removes actions outside of previous 30 days
     - Methods can organize by different criteria
     - Export however we want (excel, charts, etc.)
-
+    
     """
     def __init__(self, raw):
         self.raw = raw
         self.dataframe = pd.concat([pd.DataFrame(i[1]) for i in raw])
         self.dataframe = self.dataframe.dropna()
-        self.dataframe['keen.created_at'] = pd.to_datetime(self.dataframe['keen.created_at'])
+        self.dataframe['keen.created_at'] = pd.to_datetime(self.dataframe['keen.created_at'])  
         self.cookie_jars = pd.concat([i[0] for i in raw])
         self.cookie_jars = self.cookie_jars.dropna()
+    
+    def merge(self):
         storage = {}
         for cookie in list(set(self.cookie_jars['user.cookie.permanent.id'])):
             dft = self.cookie_jars[self.cookie_jars['user.cookie.permanent.id']==cookie]
@@ -486,7 +488,9 @@ class metric_generator():
         self.all = pd.merge(df,self.dataframe,how='right',on='user.cookie.permanent.id')
         self.all['in30days'] = ((self.all['keen.created_at'] > self.all['Delta'][0])&(self.all['keen.created_at'] < self.all['Time_of_action']))
         self.false = self.all[self.all['in30days']==False]
-
+        self.true = self.all[self.all['in30days']==True]
+        return(self.true)
+    
     def obsessions(self):
         """
         Function within metrics class. Returns all obsessions read by permanent ids by devices in last 30 days
@@ -495,7 +499,7 @@ class metric_generator():
         self.obsession = self.obsession.unstack("glass.device")
         self.obsession_plot = self.obsession.unstack("glass.device").plot(kind="barh")
         return(self.obsession)
-
+    
     def topics(self):
         """
         Function within metrics class. Returns all topics read by permanent ids by devices in last 30 days
@@ -504,7 +508,7 @@ class metric_generator():
         self.topic = self.topic.unstack("glass.device")
         self.topic_plot = self.topic.unstack("glass.device").plot(kind="barh")
         return(self.topic)
-
+        
     def countries(self):
         """
         Function within metrics class. Returns all countries where permanent ids are located
@@ -513,7 +517,7 @@ class metric_generator():
         self.country = self.country.unstack("glass.device")
         self.country_plot = self.country.unstack("glass.device").plot(kind="barh")
         return(self.country)
-
+        
     def articles(self):
         """
         Function within metrics class. Returns all articles read by permanent ids in last 30 days
