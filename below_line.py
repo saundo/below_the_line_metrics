@@ -21,6 +21,30 @@ projectID = Keen_API_credentials[Keen_silo]['projectID']
 readKey = Keen_API_credentials[Keen_silo]['readKey']
 keen = KeenClient(project_id=projectID, read_key=readKey)
 
+######### TIMEFRAME GENERATOR ##############################################
+def timeframe_gen(start, end, hour_interval=24, tz='US/Eastern'):
+    """creates timeframe for use in making Keen API calls
+    args:
+        start - start date (str - '2017-08-04'); inclusive
+        end - end date (str - '2017-08-04'); inclusive
+    kwargs:
+        hour_interval - interval for breaking up start, end tuple
+        tz - timezone
+
+    returns:
+        List of tuples, tuple - (start, end)
+    """
+
+    freq = str(hour_interval) + 'H'
+    start_dates = pd.date_range(start, end, freq=freq, tz=tz)
+    start_dates = start_dates.tz_convert('UTC')
+    end_dates = start_dates.shift(1)
+
+    start_times = [datetime.datetime.strftime(i, '%Y-%m-%dT%H:%M:%S.000Z') for i in start_dates]
+    end_times = [datetime.datetime.strftime(i, '%Y-%m-%dT%H:%M:%S.000Z') for i in end_dates]
+    timeframe = [(start_times[i], end_times[i]) for i in range(len(start_times))]
+    return timeframe
+
 ######### THREADING MODULE #################################################
 class DownloadWorker1(Thread):
     def __init__(self, queue):
