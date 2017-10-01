@@ -41,8 +41,8 @@ def timeframe_gen(start, end, hour_interval=24, tz='US/Eastern'):
     start_dates = start_dates.tz_convert('UTC')
     end_dates = start_dates.shift(1)
 
-    start_times = [datetime.datetime.strftime(i, '%Y-%m-%dT%H:%M:%S.000Z') for i in start_dates]
-    end_times = [datetime.datetime.strftime(i, '%Y-%m-%dT%H:%M:%S.000Z') for i in end_dates]
+    start_times = [datetime.strftime(i, '%Y-%m-%dT%H:%M:%S.000Z') for i in start_dates]
+    end_times = [datetime.strftime(i, '%Y-%m-%dT%H:%M:%S.000Z') for i in end_dates]
     timeframe = [(start_times[i], end_times[i]) for i in range(len(start_times))]
     return timeframe
 
@@ -86,38 +86,44 @@ def run_thread(func, timeframe, kwargs):
 
 def ad_interaction(start, end, **kwargs):
     """Keen ad_interaction event collection
-    **kwargs
-        Client: filter on client.name
-            ex. Client='amex'
-        Campaign: filter on campaign.name
-            ex. Campaign='platinum'
-        Interaction: filter on interaction name
-            ex. Interaction='clicked'
+    **kwargs; keys must be:
+            'interaction.name' --> single value or list of values
+
+            'ad_meta.client.name'
+                ex. {'ad_meta.client.name':'amex'}
+            'ad_meta.campaign.name'
+
+            'campaign.name'
+            'client.name'
+
     returns:
     + permanent cookies
     + keen.created_at
     """
-    if 'Interaction' in kwargs:
-        interaction = kwargs['Interaction']
-        op2 = 'contains'
+
+    if 'interaction.name' in kwargs:
+        interaction = kwargs['interaction.name']
+        if isinstance(interaction, str):
+            op2 = 'contains'
+        elif isinstance(interaction, list):
+            op2 = 'in'
     else:
         op2 = 'exists'
         interaction = True
 
-    if 'Client' in kwargs:
-        client = str.lower(kwargs['Client'])
+    if 'ad_meta.client.name' in kwargs:
+        client = str.lower(kwargs['ad_meta.client.name'])
         op3 = 'contains'
     else:
         op3 = 'exists'
         client = True
 
-    if 'Campaign' in kwargs:
-        campaign = str.lower(kwargs['Campaign'])
+    if 'ad_meta.campaign.name' in kwargs:
+        campaign = str.lower(kwargs['ad_meta.campaign.name'])
         op4 = 'contains'
     else:
         op4 = 'exists'
         campaign = True
-
 
     event = 'ad_interaction'
 
@@ -125,9 +131,9 @@ def ad_interaction(start, end, **kwargs):
     interval = None
     timezone = None
 
-    group_by = ('user.cookie.permanent.id','keen.created_at')
+    group_by = list(kwargs.keys()) + list(('user.cookie.permanent.id','keen.created_at'))
 
-    property_name1 = 'ad_meta.unit.type'
+    property_name1 = 'ad_meta.unit.type'    #deprecated - should switch to creative_placement.type
     operator1 = 'eq'
     property_value1 = 'display'
 
@@ -135,19 +141,19 @@ def ad_interaction(start, end, **kwargs):
     operator2 = op2
     property_value2 = interaction
 
-    property_name3 = 'ad_meta.client.name'
+    property_name3 = 'ad_meta.client.name' #deprecated - should switch to client.name
     operator3 = op3
     property_value3 = client
 
-    property_name4 = 'ad_meta.campaign.name'
+    property_name4 = 'ad_meta.campaign.name' #deprecated - should switch to campaign.name
     operator4 = op4
     property_value4 = campaign
 
 
     filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
-              {"property_name":property_name2, "operator":operator2, "property_value":property_value2},
-              {"property_name":property_name3, "operator":operator3, "property_value":property_value3},
-              {"property_name":property_name4, "operator":operator4, "property_value":property_value4}]
+               {"property_name":property_name2, "operator":operator2, "property_value":property_value2},
+               {"property_name":property_name3, "operator":operator3, "property_value":property_value3},
+               {"property_name":property_name4, "operator":operator4, "property_value":property_value4}]
 
     data = keen.count(event,
                     timeframe=timeframe,
@@ -352,15 +358,15 @@ def read_article_cookie(start, end, *kwargs):
 
 ### Putting cookies to work ###
 
-def ad_interaction(start, end, *kwargs):
-    """Keen ad_interaction event collection: for metrics
-    *kwargs
-    + filter on COOOKIES
-    + flter on Campaign
-    returns:
-    + number of impressions
-    """
-    pass
+# def ad_interaction(start, end, *kwargs):
+#     """Keen ad_interaction event collection: for metrics
+#     *kwargs
+#     + filter on COOOKIES
+#     + flter on Campaign
+#     returns:
+#     + number of impressions
+#     """
+#     pass
 
 def read_article_metrics(start, end, **kwargs):
     """Keen read_article event collection: for metrics
@@ -379,7 +385,7 @@ def read_article_metrics(start, end, **kwargs):
     + Cookie.ids
     """
     if 'Cookie_df' in kwargs:
-        cookie_list = list(set(kwargs['Cookie_df']['user.cookie.permanent.id']))
+        cookie_list = kwargs['Cookie_df']
         op2 = 'in'
     else:
         op2 = 'exists'
@@ -417,7 +423,7 @@ def read_article_metrics(start, end, **kwargs):
                     group_by=group_by,
                     filters=filters)
 
-    return(kwargs['Cookie_df'],data)
+    return data
 
 ######### Classes ###################################################
 
@@ -518,7 +524,7 @@ class metric_generator():
 
 ######### Execute ###################################################
 
-def execute_below_line(*args, *kwargs):
+def execute_below_line(*args, **kwargs):
     """the function to pull into jupyter notebook"""
     campaign_name = input('campaign name')
     start_date = input('start_date')
