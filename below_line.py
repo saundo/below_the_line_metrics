@@ -131,7 +131,7 @@ def ad_interaction(start, end, **kwargs):
     interval = None
     timezone = None
 
-    group_by = list(kwargs.keys()) + list(('user.cookie.permanent.id','keen.created_at'))
+    group_by = list(kwargs.keys()) + list(('user.cookie.permanent.id','keen.created_at', 'interaction.target'))
 
     property_name1 = 'ad_meta.unit.type'    #deprecated - should switch to creative_placement.type
     operator1 = 'eq'
@@ -423,6 +423,7 @@ def read_article_metrics(start, end, **kwargs):
                     group_by=group_by,
                     filters=filters)
 
+    print('x', end='|')
     return data
 
 ######### Classes ###################################################
