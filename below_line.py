@@ -6,6 +6,8 @@ import os
 import pickle
 import datetime
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 from keen.client import KeenClient
 from functools import wraps
 from queue import Queue
@@ -429,6 +431,63 @@ def read_article_metrics(start, end, **kwargs):
     print('x', end='|')
     return data
 
+
+def read_article_metrics_lite(start, end, **kwargs):
+    """Keen read_article event collection: for metrics
+    **kwargs
+        Cookie_df: filters on list of permanent cookie ids from dataframe
+            ex. Cookie_df = dataframe with column 'user.cookie.permanent.id'
+
+    + filter on COOOKIES
+    returns:
+    + obsessions
+    + topics
+    + article.id
+    + device
+    + geography
+    + keen timestamp
+    + Cookie.ids
+    """
+    if 'Cookie_df' in kwargs:
+        cookie_list = kwargs['Cookie_df']
+        op2 = 'in'
+    else:
+        op2 = 'exists'
+        interaction = True
+
+    event = 'read_article'
+
+    timeframe = {'start':start, 'end':end}
+    interval = None
+    timezone = None
+
+    group_by = ('article.obsessions',
+                'article.topic',
+                'glass.device',
+                'keen.created_at',
+                'user.cookie.permanent.id')
+
+    # property_name1 = 'read.type'
+    # operator1 = 'eq'
+    # property_value1 = 'start'
+
+    property_name1 = 'user.cookie.permanent.id'
+    operator1 = op2
+    property_value1 = cookie_list
+
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1}]
+              # {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]
+
+    data = keen.count(event,
+                    timeframe=timeframe,
+                    interval=interval,
+                    timezone=timezone,
+                    group_by=group_by,
+                    filters=filters)
+
+    print('x', end='|')
+    return data
+
 ######### Classes ###################################################
 
 class cookie_picker():
@@ -529,6 +588,85 @@ class metric_generator():
         self.article = self.article.unstack("glass.device")
         self.article_plot = self.article.unstack("glass.device").plot(kind="bar")
         return(self.article)
+
+######### PLOTTING ###################################################
+
+class article_starts_bar_chart():
+    def __init__(self, df, tag='obsessions'):
+        """
+        df - the input dataframe; columns contain
+            + cookies
+            + device
+            + obsessions
+            + topics
+            + result
+        tag - either 'obsessions' or 'topics'
+        """
+        self.df = df
+        self.tag = tag
+
+        if self.tag != 'obsessions' and self.tag != 'topics':
+            raise ValueError('must be obsessions or topics')
+
+        for column in ['cookies', 'device', 'result', 'obsessions', 'topics']:
+            if column not in self.df.columns:
+                raise ValueError('input dataframe columns not compatible')
+
+    def prep_data(self, device='mobile'):
+        """
+        prepares data for plotting bar charts in seaborn
+        """
+        dfx = self.df[self.df['device'] == device]
+        if self.ignore_untagged == True:
+            dfx = dfx[dfx[self.tag] != '']
+
+        dfx = dfx.groupby(self.tag).sum()
+        dfx = dfx.sort_values('result', ascending=False)
+        dfx['share (%)'] = (dfx['result'] / dfx['result'].sum()) * 100
+        dfx['share (%)'] = dfx['share (%)'].apply(lambda x: round(x, 1))
+        return dfx
+
+    def plot_data(self, max_results=15, ignore_untagged=False):
+        """
+        seaborn bar plot
+        max_results - to limit number of obssessions that are plotted
+        """
+        self.ignore_untagged = ignore_untagged
+        self.mobile = self.prep_data(device='mobile')
+        self.desktop = self.prep_data(device='desktop')
+
+        sns.set(style="white", context="talk")
+        f, (ax1, ax2) = plt.subplots(1, 2, figsize=(25, 8), sharey=True)
+        f.subplots_adjust(wspace=.1, hspace=0)
+        plot_dict = {}
+
+        # ax1, mobile
+        z = self.mobile.iloc[:max_results]
+        z = z.reset_index()
+
+        device = 'mobile'
+        total_cookies = self.df[self.df['device'] == device]['cookies'].nunique()
+        plot_dict[device] = sns.barplot(z[self.tag], z['share (%)'], palette="BuGn_d", ax=ax1)
+        label_name = device + ' n = ' + str(total_cookies)
+        ax1.set_ylabel('share (%)')
+        ax1.set_title(label_name)
+
+        # ax2, desktop
+        z = self.desktop.iloc[:max_results]
+        z = z.reset_index()
+
+        device = 'desktop'
+        total_cookies = self.df[self.df['device'] == device]['cookies'].nunique()
+        plot_dict[device] = sns.barplot(z[self.tag], z['share (%)'], palette="BuGn_d", ax=ax2)
+        label_name = device + ' n = ' + str(total_cookies)
+        ax2.set_title(label_name)
+        ax2.set_ylabel('')
+
+        #adjust the labels to be readable
+        for device in plot_dict.keys():
+            for item in plot_dict[device].get_xticklabels():
+                item.set_rotation(75)
+
 
 ######### Execute ###################################################
 
