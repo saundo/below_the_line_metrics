@@ -402,19 +402,22 @@ def read_article_metrics(start, end, **kwargs):
                 'glass.device',
                 'user.geolocation.country',
                 'keen.created_at',
-                'article.id',
+                'article.permalink',
+                'read.type',
+                'read.time.incremental.seconds',
+                'user.cookie.session.id',
                 'user.cookie.permanent.id')
 
-    property_name1 = 'read.type'
-    operator1 = 'eq'
-    property_value1 = 'start'
+    # property_name1 = 'read.type'
+    # operator1 = 'eq'
+    # property_value1 = 'start'
 
-    property_name2 = 'user.cookie.permanent.id'
-    operator2 = op2
-    property_value2 = cookie_list
+    property_name1 = 'user.cookie.permanent.id'
+    operator1 = op2
+    property_value1 = cookie_list
 
-    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
-              {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1}]
+              # {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]
 
     data = keen.count(event,
                     timeframe=timeframe,
@@ -453,7 +456,7 @@ class metric_generator():
     """class that receives cookie jars, sends them to KEEN, and then recieves
     back data; compiles the multiple data from multiple cookie jars,
     munges data, returns & exports data in a usable format for producers
-    
+
     - Receives list of DataFrames as tuples
         - First df contains list of permanent cookies and time of event action being measured
         - Second df contains metrics to be analyzed within this class (obsessions/topics/articles read)
@@ -462,16 +465,16 @@ class metric_generator():
     - Removes actions outside of previous 30 days
     - Methods can organize by different criteria
     - Export however we want (excel, charts, etc.)
-    
+
     """
     def __init__(self, raw):
         self.raw = raw
         self.dataframe = pd.concat([pd.DataFrame(i[1]) for i in raw])
         self.dataframe = self.dataframe.dropna()
-        self.dataframe['keen.created_at'] = pd.to_datetime(self.dataframe['keen.created_at'])  
+        self.dataframe['keen.created_at'] = pd.to_datetime(self.dataframe['keen.created_at'])
         self.cookie_jars = pd.concat([i[0] for i in raw])
         self.cookie_jars = self.cookie_jars.dropna()
-    
+
     def merge(self):
         storage = {}
         for cookie in list(set(self.cookie_jars['user.cookie.permanent.id'])):
@@ -490,7 +493,7 @@ class metric_generator():
         self.false = self.all[self.all['in30days']==False]
         self.true = self.all[self.all['in30days']==True]
         return(self.true)
-    
+
     def obsessions(self):
         """
         Function within metrics class. Returns all obsessions read by permanent ids by devices in last 30 days
@@ -499,7 +502,7 @@ class metric_generator():
         self.obsession = self.obsession.unstack("glass.device")
         self.obsession_plot = self.obsession.unstack("glass.device").plot(kind="barh")
         return(self.obsession)
-    
+
     def topics(self):
         """
         Function within metrics class. Returns all topics read by permanent ids by devices in last 30 days
@@ -508,7 +511,7 @@ class metric_generator():
         self.topic = self.topic.unstack("glass.device")
         self.topic_plot = self.topic.unstack("glass.device").plot(kind="barh")
         return(self.topic)
-        
+
     def countries(self):
         """
         Function within metrics class. Returns all countries where permanent ids are located
@@ -517,7 +520,7 @@ class metric_generator():
         self.country = self.country.unstack("glass.device")
         self.country_plot = self.country.unstack("glass.device").plot(kind="barh")
         return(self.country)
-        
+
     def articles(self):
         """
         Function within metrics class. Returns all articles read by permanent ids in last 30 days
