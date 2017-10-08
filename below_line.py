@@ -43,9 +43,17 @@ def timeframe_gen(start, end, hour_interval=24, tz='US/Eastern'):
     start_dates = start_dates.tz_convert('UTC')
     end_dates = start_dates.shift(1)
 
+    actual_end = pd.date_range(start, end, freq='24H', tz=tz)
+    actual_end = actual_end.tz_convert('UTC')
+    actual_end = actual_end.shift(1)
+
     start_times = [datetime.strftime(i, '%Y-%m-%dT%H:%M:%S.000Z') for i in start_dates]
     end_times = [datetime.strftime(i, '%Y-%m-%dT%H:%M:%S.000Z') for i in end_dates]
+    actual_end = [datetime.strftime(i, '%Y-%m-%dT%H:%M:%S.000Z') for i in actual_end]
+
     timeframe = [(start_times[i], end_times[i]) for i in range(len(start_times))]
+    if timeframe[-1][1] > actual_end[-1]:
+        timeframe[-1] = (start_times[-1], actual_end[-1])
     return timeframe
 
 ######### THREADING MODULE #################################################
