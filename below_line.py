@@ -84,7 +84,7 @@ def run_thread(func, timeframe, kwargs):
     return thread_storage
 
 ######### Keen API calls ###################################################
-### Grabbing cookies ###
+### Grabbing cookies - EVENTS ###
 
 def ad_interaction(start, end, **kwargs):
     """Keen ad_interaction event collection
@@ -358,7 +358,7 @@ def read_article_cookie(start, end, *kwargs):
     """
     pass
 
-### Putting cookies to work ###
+### Putting cookies to work - BEHAIVORS ###
 
 # def ad_interaction(start, end, *kwargs):
 #     """Keen ad_interaction event collection: for metrics
@@ -490,26 +490,61 @@ def read_article_metrics_lite(start, end, **kwargs):
 
 ######### Classes ###################################################
 
-class cookie_picker():
-    """class that stores cookies pulled from KEEN API calls; it then allocates
-    the cookies into different cookie jars, and then distributes the cookie
-    jars back to KEEN API calls in order to pull metrics
-    """
-    def __init__(self, name):
-        self.name = name
+class cookie_jars:
+    def __init__(self, raw_data):
+        """
+        raw_data from Keen API call
+        initializes self.cookie_data, which contains only unique cookies
+        based upon the first event that they triggered
+        """
+        d1 = raw_data
+        df_list = [pd.DataFrame(d1[key]) for key in d1.keys()]
+        df = pd.concat(df_list)
+        df['keen.created_at'] = pd.to_datetime(df['keen.created_at'])
 
-    def load_data(self, data):
-        """pull in the KEEN data"""
-        self.raw_data = data
+        #remove duplicates
+        df = df.sort_values('keen.created_at')
+        df_non_duplicated = df[~df['user.cookie.permanent.id'].duplicated()]
 
-    def find_unique_cookies(self):
-        """find the unique cookies in the data"""
-        pass
+        self.cookie_data = df_non_duplicated
+        print('data loaded', np.shape(self.cookie_data))
+        print('unique cookies', self.cookie_data.nunique())
+        print('columns', self.cookie_data.columns)
 
-    def containerize_cookies(self):
-        """allocate cookies into different jars, based upon the maximum filter
-        size that KEEN can handle"""
-        pass
+    def __repr__(self):
+        class_name = 'cookie-jar'
+        return class_name + '_' + str(np.shape(self.cookie_data))
+
+    def create_jars(self, jar_capacity=250):
+        """
+        creates jars based upon jar_capacity
+        """
+        unique_cookies = len(self.cookie_data)
+        self.cookie_data = self.cookie_data.sample(frac=1)
+
+        jars = unique_cookies // jar_capacity
+        overflow = unique_cookies % jar_capacity
+        self.pull_sequence = [250 for i in range(jars)]
+
+        if overflow > 0:
+            jars += 1
+            self.pull_sequence.append(overflow)
+        print('jars', jars)
+        print('pull_sequence', self.pull_sequence)
+
+    def fill_jars(self):
+        self.jar_container = {}
+        for n, i in enumerate(self.pull_sequence):
+            if n == 0:
+                s1 = 0
+                s2 = i
+            else:
+                s1 = s2
+                s2 += i
+            name = str(s1) + '-' + str(s2)
+
+            self.jar_container[name] = df_non_dupe[s1:s2]
+            print(name, ' filled', end=' | ')
 
 class metric_generator():
     """class that receives cookie jars, sends them to KEEN, and then recieves
@@ -617,48 +652,83 @@ class article_starts_bar_chart():
         prepares data for plotting bar charts in seaborn
         """
         dfx = self.df[self.df['device'] == device]
-        if self.ignore_untagged == True:
+        if self.ignore_untagged == 'yes_sneaky':
             dfx = dfx[dfx[self.tag] != '']
+        elif self.ignore_untagged == 'yes_honest':
+            pass
+        elif self.ignore_untagged == 'no':
+            pass
+        else:
+            raise ValueError('ignore_untagged not a recognized kwarg')
 
-        dfx = dfx.groupby(self.tag).sum()
-        dfx = dfx.sort_values('result', ascending=False)
-        dfx['share (%)'] = (dfx['result'] / dfx['result'].sum()) * 100
-        dfx['share (%)'] = dfx['share (%)'].apply(lambda x: round(x, 1))
-        return dfx
+        dfx1 = dfx.groupby(self.tag).nunique()
+        dfx1 = dfx1[['cookies']]
+        dfx1['c share (%)'] = (dfx1['cookies'] / dfx['cookies'].nunique()) * 100
+        dfx1['c share (%)'] = dfx1['c share (%)'].apply(lambda x: round(x, 1))
+        dfx1 = dfx1.reset_index()
 
-    def plot_data(self, max_results=15, ignore_untagged=False):
+        dfx2 = dfx.groupby(self.tag).sum()
+        dfx2 = dfx2.sort_values('result', ascending=False)
+        dfx2['pv share (%)'] = (dfx2['result'] / dfx2['result'].sum()) * 100
+        dfx2['pv share (%)'] = dfx2['pv share (%)'].apply(lambda x: round(x, 1))
+        dfx2 = dfx2.reset_index()
+
+        dfx3 = pd.merge(dfx1, dfx2, on=self.tag)
+        return dfx3
+
+    def plot_data(self, max_results=15, display='pv', ignore_untagged='no'):
         """
         seaborn bar plot
         max_results - to limit number of obssessions that are plotted
+        display can be either:
+            - 'pv'
+            - 'cookies'
+        ignore_untagged can be either:
+            - 'no'; default, will show everything
+            - 'yes_honest'; the truthful way of showing
+            - 'yes_sneaky'; leaving untagged out from denominator
+
         """
         self.ignore_untagged = ignore_untagged
         self.mobile = self.prep_data(device='mobile')
         self.desktop = self.prep_data(device='desktop')
 
+        if display == 'pv':
+            value_col = 'pv share (%)'
+        elif display == 'cookies':
+            value_col = 'c share (%)'
+        else:
+            raise ValueError("not a recognized display kwarg, must be either 'pv' or 'cookies'")
+
         sns.set(style="white", context="talk")
-        f, (ax1, ax2) = plt.subplots(1, 2, figsize=(25, 8), sharey=True)
+        f, (ax1, ax2) = plt.subplots(1, 2, figsize=(25, 6), sharey=True)
         f.subplots_adjust(wspace=.1, hspace=0)
         plot_dict = {}
 
+        if ignore_untagged == 'yes_honest':
+            i1 = 1
+        else:
+            i1 = 0
+
         # ax1, mobile
-        z = self.mobile.iloc[:max_results]
+        z = self.mobile.sort_values(value_col, ascending=False).iloc[i1:max_results]
         z = z.reset_index()
 
         device = 'mobile'
         total_cookies = self.df[self.df['device'] == device]['cookies'].nunique()
-        plot_dict[device] = sns.barplot(z[self.tag], z['share (%)'], palette="BuGn_d", ax=ax1)
-        label_name = device + ' n = ' + str(total_cookies)
-        ax1.set_ylabel('share (%)')
+        plot_dict[device] = sns.barplot(z[self.tag], z[value_col], palette="BuGn_d", ax=ax1)
+        label_name = device + ' n = ' + str(total_cookies) + " ignore '' value= " + ignore_untagged
+        ax1.set_ylabel(value_col)
         ax1.set_title(label_name)
 
         # ax2, desktop
-        z = self.desktop.iloc[:max_results]
+        z = self.desktop.sort_values(value_col, ascending=False).iloc[i1:max_results]
         z = z.reset_index()
 
         device = 'desktop'
         total_cookies = self.df[self.df['device'] == device]['cookies'].nunique()
-        plot_dict[device] = sns.barplot(z[self.tag], z['share (%)'], palette="BuGn_d", ax=ax2)
-        label_name = device + ' n = ' + str(total_cookies)
+        plot_dict[device] = sns.barplot(z[self.tag], z[value_col], palette="GnBu_d", ax=ax2)
+        label_name = device + ' n = ' + str(total_cookies) + " ignore '' value= " + ignore_untagged
         ax2.set_title(label_name)
         ax2.set_ylabel('')
 
