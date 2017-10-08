@@ -4,7 +4,7 @@
 ######### imports #########################################################
 import os
 import pickle
-import datetime
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -529,6 +529,7 @@ class cookie_jars:
         """
         unique_cookies = len(self.cookie_data)
         self.cookie_data = self.cookie_data.sample(frac=1)
+        print('cookies randomized!')
 
         jars = unique_cookies // jar_capacity
         overflow = unique_cookies % jar_capacity
@@ -551,8 +552,108 @@ class cookie_jars:
                 s2 += i
             name = str(s1) + '-' + str(s2)
 
-            self.jar_container[name] = df_non_dupe[s1:s2]
+            self.jar_container[name] = self.cookie_data[s1:s2]
             print(name, ' filled', end=' | ')
+
+
+
+
+
+class behavior_event():
+    def __init__(self, jar_container):
+        """
+        jar_container - all the jars containing cookies
+        """
+        self.jar_container = jar_container
+
+    def inspect_behavioral_event(self, behavior_function, jars_to_process=1):
+        """
+        behavior function - function intending to run; e.g. read_article_metrics
+        """
+        self.behavior_function = behavior_function
+        jars = list(self.jar_container.values())
+
+        #loop over jars, and run API calls
+        container = []
+        for i in range(jars_to_process):
+            cookie_list = list(jars[i]['user.cookie.permanent.id'])
+
+            #timeframe -- should just make this a function
+            d1 = jars[i]['keen.created_at'].min() - timedelta(days=30)
+            d2 = jars[i]['keen.created_at'].max() + timedelta(days=1)
+            d1 = datetime.strftime(d1, '%Y-%m-%dT%H:%M:%S.000Z')
+            d2 = datetime.strftime(d2, '%Y-%m-%dT%H:%M:%S.000Z')
+            hour_interval = 24
+            timeframe = timeframe_gen(d1, d2, hour_interval=hour_interval, tz=None)
+
+            #API calls
+            failure_log = []
+            data = run_thread(behavior_function, timeframe, {'Cookie_df':cookie_list})
+
+            dft = pd.concat([pd.DataFrame(data[key]) for key in data.keys()])
+            dft['keen.created_at'] = pd.to_datetime(dft['keen.created_at'])
+
+            #append data to container; storing as a tuple
+            container.append(
+                (jars[i][['user.cookie.permanent.id', 'keen.created_at']], dft)
+            )
+            print(len(jars[i]))
+
+        df_cookies = []
+        df_events = []
+        for pairs in container:
+            #pairs are tuples; 0-cookies, 1-events
+            df_cookies.append(pairs[0])
+            df_events.append(pairs[1])
+
+        self.df_cookies = pd.concat(df_cookies)
+        self.df_events = pd.concat(df_events)
+        print(len(self.df_cookies))
+        print(self.df_events['user.cookie.permanent.id'].nunique())
+
+    def enforce_time_window(self, prior_days=30, forward_days=1):
+        """
+        calculate the time window of consideration for inluding / excluding
+        behavorial events
+
+        kwargs:
+            prior_days - number of days before event to consider in window
+            forward_days - number of day(s) after event to consider
+        """
+
+        #bring events and cookies together, for identifying the event_time
+        dfz = pd.merge(self.df_events, self.df_cookies, on='user.cookie.permanent.id')
+
+        #rename columns for easier idenitifcation
+        dfz = dfz.rename(index=str, columns={"keen.created_at_x": "metric_time", "keen.created_at_y": "event_time"})
+
+        #create timedelta for 30 days in the past
+        col_name_p = 'event_time_-' + str(prior_days)
+        dfz[col_name_p] = dfz['event_time'] - timedelta(days=prior_days)
+
+        #create timedelta for 1 day ahead of the event
+        col_name_f = 'event_time_-' + str(forward_days)
+        dfz[col_name_f] = dfz['event_time'] + timedelta(days=forward_days)
+
+        #boolean test to see if metric time falls within 30 day window
+        dfz['metric_in_timeframe'] = (dfz['metric_time'] < dfz[col_name_f]) & (dfz['metric_time'] > dfz[col_name_p])
+
+        self.df = dfz
+        self.processed = dfz[dfz['metric_in_timeframe'] == True]
+        #some error checking....hmmmmmmm
+        print('whole shape', np.shape(dfz))
+        print('processed shape', np.shape(dfz[dfz['metric_in_timeframe'] == True]))
+        print()
+
+        print('whole unique cookies', self.df_cookies['user.cookie.permanent.id'].nunique())
+        print('1st stage unique cookies', dfz['user.cookie.permanent.id'].nunique())
+        print('processed unique cookies', self.processed['user.cookie.permanent.id'].nunique())
+
+
+
+
+
+
 
 class metric_generator():
     """class that receives cookie jars, sends them to KEEN, and then recieves
