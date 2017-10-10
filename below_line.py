@@ -271,38 +271,47 @@ def ad_impression(start, end, **kwargs):
 def ad_video_progress(start, end, **kwargs):
     """Keen ad_video_progress event collection
     **kwargs
-        Client: filter on client.name
-            ex. Client='amex'
-        Campaign: filter on campaign.name
-            ex. Campaign='platinum'
-        Video_Progress: filter on specific point watched in video
-            ex. Video_Progress=5 or Video_Progress=[5,25,50,75,100]
+        'ad_meta.campaign.name': filter on campaign.name
+            string: 'inspiredmatters'
+        'glass.device': filter on glass.device
+            string: 'mobile'
+        'video.progress.percent_viewed': filter on specific point watched in video
+            int or list: 5 or [5,25,50,75,100]
+        'ad_meta.client.name': filter on client.name
+            string: 'amex'
     returns:
     + permanent cookies
     + keen.created_at
     + progress type
+    + unit.id
+    + video.title
     """
-    if 'Video_Progress' in kwargs:
-        video_mark = kwargs['Video_Progress']
-        op2 = 'in'
+    op1 = op2 = op3 = op4 =  'eq'
+    if 'ad_meta.campaign.name' in kwargs: campaign_name = kwargs['ad_meta.campaign.name']
     else:
+        campaign_name = True
+        op1 = 'exists'
+
+    if 'glass.device' in kwargs: glass_device = kwargs['glass.device']
+    else:
+        glass_device = True
         op2 = 'exists'
-        video_mark = True
 
-    if 'Client' in kwargs:
-        client = str.lower(kwargs['Client'])
-        op3 = 'contains'
+    if 'video.progress.percent_viewed' in kwargs:
+        percent_viewed = kwargs['video.progress.percent_viewed']
+        if isinstance(percent_viewed, list):
+            op3 = 'in'
+        elif isinstance(percent_viewed, int):
+            op3 = 'eq'
+
     else:
+        percent_viewed = True
         op3 = 'exists'
-        client = True
 
-    if 'Campaign' in kwargs:
-        campaign = str.lower(kwargs['Campaign'])
-        op4 = 'contains'
+    if 'ad_meta.client.name' in kwargs: client_name = kwargs['ad_meta.campaign.name']
     else:
+        client_name = True
         op4 = 'exists'
-        campaign = True
-
 
     event = 'ad_video_progress'
 
@@ -310,36 +319,39 @@ def ad_video_progress(start, end, **kwargs):
     interval = None
     timezone = None
 
-    group_by = ('user.cookie.permanent.id','keen.created_at','video.title', 'video.progress.percent_viewed')
+    group_by = ('ad_meta.campaign.name', 'ad_meta.client.name',
+                'ad_meta.unit.id',
+                'glass.device', 'user.cookie.permanent.id',
+                'video.progress.percent_viewed',
+                'keen.created_at','video.title',)
 
-    property_name1 = 'ad_meta.unit.type'
-    operator1 = 'eq'
-    property_value1 = 'display'
+    property_name1 = 'ad_meta.campaign.name'
+    operator1 = op1
+    property_value1 = campaign_name
 
-    property_name2 = 'video.progress.percent_viewed'
+    property_name2 = 'glass.device'
     operator2 = op2
-    property_value2 = video_mark
+    property_value2 = glass_device
 
-    property_name3 = 'ad_meta.client.name'
+    property_name3 = 'video.progress.percent_viewed'
     operator3 = op3
-    property_value3 = client
+    property_value3 = percent_viewed
 
-    property_name4 = 'ad_meta.campaign.name'
+    property_name4 = 'ad_meta.client.name'
     operator4 = op4
-    property_value4 = campaign
-
+    property_value4 = client_name
 
     filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
-              {"property_name":property_name2, "operator":operator2, "property_value":property_value2},
-              {"property_name":property_name3, "operator":operator3, "property_value":property_value3},
-              {"property_name":property_name4, "operator":operator4, "property_value":property_value4}]
+               {"property_name":property_name2, "operator":operator2, "property_value":property_value2},
+               {"property_name":property_name3, "operator":operator3, "property_value":property_value3},
+               {"property_name":property_name4, "operator":operator4, "property_value":property_value4}]
 
     data = keen.count(event,
-                    timeframe=timeframe,
-                    interval=interval,
-                    timezone=timezone,
-                    group_by=group_by,
-                    filters=filters)
+                      timeframe=timeframe,
+                      interval=interval,
+                      timezone=timezone,
+                      group_by=group_by,
+                      filters=filters)
 
     return data
 
@@ -365,18 +377,6 @@ def read_article_cookie(start, end, *kwargs):
     + time spent (read.type), incremental seconds
     """
     pass
-
-### Putting cookies to work - BEHAIVORS ###
-
-# def ad_interaction(start, end, *kwargs):
-#     """Keen ad_interaction event collection: for metrics
-#     *kwargs
-#     + filter on COOOKIES
-#     + flter on Campaign
-#     returns:
-#     + number of impressions
-#     """
-#     pass
 
 def read_article_metrics(start, end, **kwargs):
     """Keen read_article event collection: for metrics
@@ -439,7 +439,6 @@ def read_article_metrics(start, end, **kwargs):
     print('x', end='|')
     return data
 
-
 def read_article_metrics_lite(start, end, **kwargs):
     """Keen read_article event collection: for metrics
     **kwargs
@@ -475,6 +474,62 @@ def read_article_metrics_lite(start, end, **kwargs):
                 'keen.created_at',
                 'user.cookie.permanent.id')
 
+    property_name1 = 'read.type'
+    operator1 = 'eq'
+    property_value1 = 'start'
+
+    property_name2 = 'user.cookie.permanent.id'
+    operator2 = op2
+    property_value2 = cookie_list
+
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
+               {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]
+
+    data = keen.count(event,
+                    timeframe=timeframe,
+                    interval=interval,
+                    timezone=timezone,
+                    group_by=group_by,
+                    filters=filters)
+
+    print('x', end='|')
+    return data
+
+def read_article_metrics_var(start, end, **kwargs):
+    """Keen read_article event collection: for metrics
+    **kwargs
+        Cookie_df: filters on list of permanent cookie ids from dataframe
+            ex. Cookie_df = dataframe with column 'user.cookie.permanent.id'
+
+    + filter on COOOKIES
+    returns:
+    + obsessions
+    + topics
+    + article.id
+    + device
+    + geography
+    + keen timestamp
+    + Cookie.ids
+    """
+    if 'Cookie_df' in kwargs:
+        cookie_list = kwargs['Cookie_df']
+        op2 = 'in'
+    else:
+        op2 = 'exists'
+        interaction = True
+
+    if 'tag' in kwargs:
+        pass
+
+
+    event = 'read_article'
+
+    timeframe = {'start':start, 'end':end}
+    interval = None
+    timezone = None
+
+    group_by = kwargs['group_by']
+
     # property_name1 = 'read.type'
     # operator1 = 'eq'
     # property_value1 = 'start'
@@ -485,6 +540,159 @@ def read_article_metrics_lite(start, end, **kwargs):
 
     filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1}]
               # {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]
+
+    data = keen.count(event,
+                    timeframe=timeframe,
+                    interval=interval,
+                    timezone=timezone,
+                    group_by=group_by,
+                    filters=filters)
+
+    print('x', end='|')
+    return data
+
+def read_article_metrics_time(start, end, **kwargs):
+    """Keen read_article event, capturing time spent of cookies
+
+    **kwargs
+        Cookie_df: filters on list of permanent cookie ids from dataframe
+            ex. Cookie_df = dataframe with column 'user.cookie.permanent.id'
+
+    + filter on COOOKIES, and an obsession
+    returns:
+    + obsessions
+    + device
+    + keen timestamp
+    + Cookie.ids
+    + read.type
+    + read.time.incremental.seconds
+    """
+
+    if 'Cookie_df' in kwargs:
+        cookie_list = kwargs['Cookie_df']
+        op1 = 'in'
+    else:
+        op2 = 'exists'
+        interaction = True
+
+    if 'article.obsessions' in kwargs:
+        article_obsession = kwargs['article.obsessions']
+        op2 = 'eq'
+    else:
+        op2 = 'exists'
+        interaction = True
+
+
+
+    event = 'read_article'
+
+    timeframe = {'start':start, 'end':end}
+    interval = None
+    timezone = None
+
+    group_by = ('article.obsessions',
+                'glass.device',
+                'keen.created_at',
+                'read.type',
+                'read.time.incremental.seconds',
+                'user.cookie.permanent.id')
+
+    property_name1 = 'user.cookie.permanent.id'
+    operator1 = op1
+    property_value1 = cookie_list
+
+    property_name2 = 'article.obsessions'
+    operator2 = op2
+    property_value2 = article_obsession
+
+
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
+               {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]
+
+    data = keen.count(event,
+                    timeframe=timeframe,
+                    interval=interval,
+                    timezone=timezone,
+                    group_by=group_by,
+                    filters=filters)
+
+    print('x', end='|')
+    return data
+
+def read_article_sum_time(start, end, **kwargs):
+    """
+    """
+
+    if 'Cookie_df' in kwargs:
+        cookie_list = kwargs['Cookie_df']
+        op1 = 'in'
+    else:
+        op1 = 'exists'
+        cookie_list = True
+
+    if 'article.obsessions' in kwargs:
+        article_obsession = kwargs['article.obsessions']
+        op2 = 'eq'
+    else:
+        op2 = 'exists'
+        article_obsession = True
+
+    event = 'read_article'
+
+    target_property = 'read.time.incremental.seconds'
+
+    timeframe = {'start':start, 'end':end}
+    interval = None
+    timezone = None
+
+    group_by = ('article.obsessions',
+                'glass.device')
+
+    property_name1 = 'user.cookie.permanent.id'
+    operator1 = op1
+    property_value1 = cookie_list
+
+    property_name2 = 'article.obsessions'
+    operator2 = op2
+    property_value2 = article_obsession
+
+    property_name3 = 'read.time.incremental.seconds'
+    operator3 = 'gt'
+    property_value3 = 0
+
+    property_name4 = 'read.time.incremental.seconds'
+    operator4 = 'lt'
+    property_value4 = 300
+
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
+               {"property_name":property_name2, "operator":operator2, "property_value":property_value2},
+               {"property_name":property_name3, "operator":operator3, "property_value":property_value3},
+               {"property_name":property_name4, "operator":operator4, "property_value":property_value4}]
+
+    data = keen.sum(event, target_property=target_property,
+                    timeframe=timeframe,
+                    interval=interval,
+                    timezone=timezone,
+                    group_by=group_by,
+                    filters=filters)
+
+    print('x', end='|')
+    return data
+
+def read_article_pv(start, end, **kwargs):
+    event = 'read_article'
+
+    timeframe = {'start':start, 'end':end}
+    interval = None
+    timezone = None
+
+    group_by = ('article.obsessions', 'glass.device')
+
+    property_name1 = 'read.type'
+    operator1 = 'eq'
+    property_value1 = 'start'
+
+    filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1}]
 
     data = keen.count(event,
                     timeframe=timeframe,
@@ -533,7 +741,7 @@ class cookie_jars:
 
         jars = unique_cookies // jar_capacity
         overflow = unique_cookies % jar_capacity
-        self.pull_sequence = [250 for i in range(jars)]
+        self.pull_sequence = [jar_capacity for i in range(jars)]
 
         if overflow > 0:
             jars += 1
@@ -555,10 +763,6 @@ class cookie_jars:
             self.jar_container[name] = self.cookie_data[s1:s2]
             print(name, ' filled', end=' | ')
 
-
-
-
-
 class behavior_event():
     def __init__(self, jar_container):
         """
@@ -566,7 +770,7 @@ class behavior_event():
         """
         self.jar_container = jar_container
 
-    def inspect_behavioral_event(self, behavior_function, jars_to_process=1):
+    def inspect_behavioral_event(self, behavior_function, jars_to_process=1, hour_interval=24):
         """
         behavior function - function intending to run; e.g. read_article_metrics
         """
@@ -583,7 +787,6 @@ class behavior_event():
             d2 = jars[i]['keen.created_at'].max() + timedelta(days=1)
             d1 = datetime.strftime(d1, '%Y-%m-%dT%H:%M:%S.000Z')
             d2 = datetime.strftime(d2, '%Y-%m-%dT%H:%M:%S.000Z')
-            hour_interval = 24
             timeframe = timeframe_gen(d1, d2, hour_interval=hour_interval, tz=None)
 
             #API calls
@@ -648,12 +851,6 @@ class behavior_event():
         print('whole unique cookies', self.df_cookies['user.cookie.permanent.id'].nunique())
         print('1st stage unique cookies', dfz['user.cookie.permanent.id'].nunique())
         print('processed unique cookies', self.processed['user.cookie.permanent.id'].nunique())
-
-
-
-
-
-
 
 class metric_generator():
     """class that receives cookie jars, sends them to KEEN, and then recieves
@@ -845,7 +1042,6 @@ class article_starts_bar_chart():
         for device in plot_dict.keys():
             for item in plot_dict[device].get_xticklabels():
                 item.set_rotation(75)
-
 
 ######### Execute ###################################################
 
